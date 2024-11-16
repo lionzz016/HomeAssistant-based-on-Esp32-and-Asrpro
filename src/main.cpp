@@ -162,7 +162,7 @@ void setup(void)
 {
   Serial.begin(115200);
 
-  Serial2.begin(9600);
+  Serial2.begin(115200);
   Serial2.onReceive(getLightStat_ASRPRO);
 
   // 获取网络时间
