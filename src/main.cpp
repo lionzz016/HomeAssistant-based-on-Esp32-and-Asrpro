@@ -178,7 +178,7 @@ void setup(void)
   tft.drawSmoothArc(75, 68, 22, 20, 0, 360, 0xeff, TFT_TRANSPARENT);
 
   tft.setSwapBytes(true);
-  tft.pushImage(144, 1, 16, 16, img_fan_off);
+  tft.pushImage(146, 2, 13, 13, img_fan_off);
   tft.pushImage(144, 17, 16, 16, img_light_off);
 
   dht.begin();
@@ -286,7 +286,7 @@ void loop()
   if (objBuffer.equals("LIGHT"))
     statBuffer.equals("ON") ? tft.pushImage(144, 17, 16, 16, img_light_on) : tft.pushImage(144, 17, 16, 16, img_light_off);
   if (objBuffer.equals("FAN"))
-    statBuffer.equals("ON") ? tft.pushImage(144, 1, 16, 16, img_fan) : tft.pushImage(144, 1, 16, 16, img_fan_off);
+    statBuffer.equals("ON") ? tft.pushImage(146, 2, 13, 13, img_fan_on) : tft.pushImage(146, 2, 13, 13, img_fan_off);
 }
 
 /**
@@ -373,7 +373,6 @@ void sendData()
     postMsgId += 1;
     sprintf(jsonBuf, ONENET_POST_BODY_FORMAT, postMsgId, param);
 
-    // Serial.print("public the data:");
     // client.publish("$dp", (uint8_t *)msg_buf, 3+strlen(msgJson));
     client.publish(ONENET_TOPIC_POST, jsonBuf);
     // 发送数据到主题
