@@ -79,9 +79,11 @@ code	color
 
 // 天气api的私钥
 #define API_KEY "SPIRhXLh-dt5N2tga"
-//
+// 目标地区的信息
 #define API_LOCATION "Guangzhou"
+// 数据形式，en：英文数据，zh-CN：中文数据
 #define API_LANGUAGE "en"
+// c：公制单位，f：英制单位
 #define API_UNIT "c"
 
 // 网络实时时间
@@ -121,11 +123,8 @@ struct tm timestamp;
 String MONTH[] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
 
-// 串口回调函数接收AsrPro发送的数据的buffer变量，采用全局变量是为了其他函数的使用
-// String recvBuffer = "";
-String objBuffer = "";
-String statBuffer = "";
-uint8_t cmd = 0xff;
+// 串口回调函数接收AsrPro发送的十六进制数据的sta变量，采用全局变量是为了其他函数的使用
+uint8_t sta = 0xff;
 /**============================================================================= */
 
 /**
@@ -283,19 +282,31 @@ void loop()
   (WiFi.status() == WL_CONNECTED) ? tft.pushImage(144, 33, 16, 16, img_wifi_on)
                                   : tft.pushImage(144, 33, 16, 16, img_wifi_off);
 
-  if (cmd == 0x01)
+  if (sta == 0x01)
     tft.pushImage(144, 17, 16, 16, img_light_on);
-  if (cmd == 0x00)
+  if (sta == 0x00)
     tft.pushImage(144, 17, 16, 16, img_light_off);
-  if (cmd == 0x11)
+  if (sta == 0x11)
     tft.pushImage(146, 2, 13, 13, img_fan_on);
-  if (cmd == 0x10)
+  if (sta == 0x10)
     tft.pushImage(146, 2, 13, 13, img_fan_off);
 
-  // if (objBuffer.equals("LIGHT"))
-  //   statBuffer.equals("ON") ? tft.pushImage(144, 17, 16, 16, img_light_on) : tft.pushImage(144, 17, 16, 16, img_light_off);
-  // if (objBuffer.equals("FAN"))
-  //   statBuffer.equals("ON") ? tft.pushImage(146, 2, 13, 13, img_fan_on) : tft.pushImage(146, 2, 13, 13, img_fan_off);
+  if (sta == 0xDF)
+  {
+    char s[15];
+    Serial2.printf("%s,%s", weather, temp);
+    sprintf(s, "%s,%s", weather, temp);
+    Serial.println(s);
+    // Serial.println(String(s).substring(0, (String(s).indexOf(",", 1))));
+    // Serial.println(String(s).substring(String(s).indexOf(",", 1) + 1));
+    sta = 0xFF;
+  }
+
+  if (sta == 0xBF)
+  {
+    Serial2.printf("%d-%d/%d.%d,%d:%d", timestamp.tm_year + 1900, timestamp.tm_mon + 1, timestamp.tm_mday, timestamp.tm_wday, timestamp.tm_hour, timestamp.tm_min);
+    sta = 0xFF;
+  }
 }
 
 /**
@@ -348,6 +359,7 @@ void setOneNet()
   }
 }
 
+// 订阅MQTT所发布的主题的回调函数
 void Callback(char *topic, byte *payload, unsigned int length)
 {
   Serial.print("Message arrived [");
@@ -434,7 +446,7 @@ void updateImg(const char *city, const char *weatherStat, const char *temp)
   // 晴天，不区分早晚
   if (s.equals("Sunny") || s.equals("Clear"))
   {
-    tft.pushImage(109, 60, 27, 27, img_sunny);
+    tft.pushImage(109, 60, 26, 27, img_sunny);
     tft.drawString("SN", 141, 75, 2);
   }
   // 多云
@@ -531,15 +543,8 @@ void getStat_ASRPRO()
 {
   if (Serial2.available())
   {
-    // String recvBuffer = Serial2.readString();
-    // objBuffer = recvBuffer.substring(0, recvBuffer.indexOf(":"));
-    // statBuffer = recvBuffer.substring(recvBuffer.indexOf(":") + 1);
-    Serial2.read(&cmd, 1);
+    Serial2.read(&sta, 1);
   }
   // Serial.println(objBuffer);
   // Serial.println(statBuffer);
 }
-
-// void sendCommand_ASRPRO()
-// {
-// }
