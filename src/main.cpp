@@ -125,7 +125,7 @@ String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
 // String recvBuffer = "";
 String objBuffer = "";
 String statBuffer = "";
-
+uint8_t cmd = 0xff;
 /**============================================================================= */
 
 /**
@@ -140,7 +140,7 @@ void Callback(char *topic, byte *payload, unsigned int length);
 void sendData();
 void getWeather();
 void updateImg(const char *city, const char *weatherStat, const char *temp);
-void getLightStat_ASRPRO();
+void getStat_ASRPRO();
 
 Ticker tim1(sendData, 300);
 Ticker tim2(getWeather, 5000);
@@ -163,7 +163,7 @@ void setup(void)
   Serial.begin(115200);
 
   Serial2.begin(115200);
-  Serial2.onReceive(getLightStat_ASRPRO);
+  Serial2.onReceive(getStat_ASRPRO);
 
   // 获取网络时间
   configTime(TIME_OFFSET_SEC, TIME_OFFSET_DAYLIGHT_SEC, TIME_NTP_SERVER);
@@ -283,10 +283,19 @@ void loop()
   (WiFi.status() == WL_CONNECTED) ? tft.pushImage(144, 33, 16, 16, img_wifi_on)
                                   : tft.pushImage(144, 33, 16, 16, img_wifi_off);
 
-  if (objBuffer.equals("LIGHT"))
-    statBuffer.equals("ON") ? tft.pushImage(144, 17, 16, 16, img_light_on) : tft.pushImage(144, 17, 16, 16, img_light_off);
-  if (objBuffer.equals("FAN"))
-    statBuffer.equals("ON") ? tft.pushImage(146, 2, 13, 13, img_fan_on) : tft.pushImage(146, 2, 13, 13, img_fan_off);
+  if (cmd == 0x01)
+    tft.pushImage(144, 17, 16, 16, img_light_on);
+  if (cmd == 0x00)
+    tft.pushImage(144, 17, 16, 16, img_light_off);
+  if (cmd == 0x11)
+    tft.pushImage(146, 2, 13, 13, img_fan_on);
+  if (cmd == 0x10)
+    tft.pushImage(146, 2, 13, 13, img_fan_off);
+
+  // if (objBuffer.equals("LIGHT"))
+  //   statBuffer.equals("ON") ? tft.pushImage(144, 17, 16, 16, img_light_on) : tft.pushImage(144, 17, 16, 16, img_light_off);
+  // if (objBuffer.equals("FAN"))
+  //   statBuffer.equals("ON") ? tft.pushImage(146, 2, 13, 13, img_fan_on) : tft.pushImage(146, 2, 13, 13, img_fan_off);
 }
 
 /**
@@ -518,14 +527,19 @@ void updateImg(const char *city, const char *weatherStat, const char *temp)
 /**
  *  串口2回调函数，接收AsrPro串口发送的数据（状态码，如灯光状态、风扇状态），并处理
  */
-void getLightStat_ASRPRO()
+void getStat_ASRPRO()
 {
   if (Serial2.available())
   {
-    String recvBuffer = Serial2.readString();
-    objBuffer = recvBuffer.substring(0, recvBuffer.indexOf(":"));
-    statBuffer = recvBuffer.substring(recvBuffer.indexOf(":") + 1);
+    // String recvBuffer = Serial2.readString();
+    // objBuffer = recvBuffer.substring(0, recvBuffer.indexOf(":"));
+    // statBuffer = recvBuffer.substring(recvBuffer.indexOf(":") + 1);
+    Serial2.read(&cmd, 1);
   }
   // Serial.println(objBuffer);
   // Serial.println(statBuffer);
 }
+
+// void sendCommand_ASRPRO()
+// {
+// }
