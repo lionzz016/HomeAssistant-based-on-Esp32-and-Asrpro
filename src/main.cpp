@@ -47,6 +47,7 @@ code	color
 /**
  * ==============================defination blocks===============================
  * declare definations here blow
+ * 所有具有潜在修改需求的值采用宏定义或静态字符串
  */
 // DHT测温模块的信息引脚和类型
 #define DHTPIN 4
@@ -116,27 +117,21 @@ const char *temp;
 
 // 声明获取的实时时间的结构体变量
 struct tm timestamp;
-// uint8_t hh = timestamp.tm_hour;
-// uint8_t mm = timestamp.tm_min;
-// uint8_t ss = timestamp.tm_sec; // Get H, M, S from compile time
-// uint8_t MM = timestamp.tm_mon;
-// uint8_t dd = timestamp.tm_mday;
-// uint16_t yy = timestamp.tm_year + 1900;
+// 需要显示的月份和星期数组
 String MONTH[] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
+
+// 串口回调函数接收AsrPro发送的数据的buffer变量，采用全局变量是为了其他函数的使用
+// String recvBuffer = "";
+String objBuffer = "";
+String statBuffer = "";
+
 /**============================================================================= */
 
 /**
  * =========================customerized functions blocks=======================
  * declare customerized functions here blow
  */
-// static uint8_t conv2d(const char *p)
-// {
-//   uint8_t v = 0;
-//   if ('0' <= *p && *p <= '9')
-//     v = *p - '0';
-//   return 10 * v + *++p - '0';
-// }
 
 void setWiFi();
 void setOneNet();
@@ -152,6 +147,7 @@ Ticker tim2(getWeather, 5000);
 Ticker tim3(setWiFi, 100);
 Ticker tim4(setOneNet, 100);
 
+// 获取完整天气api的连接，设置参数是为了低耦合
 String getURL(const char *key, const char *location, const char *lang, const char *unit)
 {
   String s = "https://api.seniverse.com/v3/weather/now.json?key=" + String(key) + "&location=" + String(location) + "&language=" + String(lang) + "&unit=" + String(unit);
@@ -175,11 +171,15 @@ void setup(void)
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Note: the new fonts do not draw the background colour
-  // targetTime = millis() + 1000;
+  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+
   tft.fillSmoothRoundRect(0, 50, 63, 3, 2, 0xeff);
   tft.fillSmoothRoundRect(88, 50, 73, 3, 2, 0xeff);
   tft.drawSmoothArc(75, 68, 22, 20, 0, 360, 0xeff, TFT_TRANSPARENT);
+
+  tft.setSwapBytes(true);
+  tft.pushImage(144, 1, 16, 16, img_fan_off);
+  tft.pushImage(144, 17, 16, 16, img_light_off);
 
   dht.begin();
 
@@ -208,15 +208,13 @@ void loop()
     initial = 0;
   }
 
-  // Update digital time
   byte xpos = 6;
   byte ypos = 0;
   if (omm != timestamp.tm_min)
-  { // Only redraw every minute to minimise flicker
-    // Uncomment ONE of the next 2 lines, using the ghost image demonstrates text overlay as time is drawn over it
-    tft.setTextColor(0x39C4, TFT_BLACK); // Leave a 7 segment ghost image, comment out next line!
-    tft.drawString("88:88", xpos, ypos, 7); // Overwrite the text to clear it
-    tft.setTextColor(0xFBE0);               // Orange
+  {
+    tft.setTextColor(0x39C4, TFT_BLACK);
+    tft.drawString("88:88", xpos, ypos, 7);
+    tft.setTextColor(0xFBE0);
     omm = timestamp.tm_min;
 
     if (timestamp.tm_hour < 10)
@@ -230,7 +228,7 @@ void loop()
   }
 
   if (timestamp.tm_sec % 2)
-  { // Flash the colon
+  {
     tft.setTextColor(0x39C4, TFT_BLACK);
     xpos += tft.drawChar(':', xcolon, ypos, 7);
     tft.setTextColor(0xFBE0, TFT_BLACK);
@@ -282,14 +280,18 @@ void loop()
   tim2.update();
 
   tft.setSwapBytes(true);
-  if (WiFi.status() == WL_CONNECTED)
-    tft.pushImage(144, 33, 16, 16, img_wifi_on);
-  else
-    tft.pushImage(144, 33, 16, 16, img_wifi_off);
+  (WiFi.status() == WL_CONNECTED) ? tft.pushImage(144, 33, 16, 16, img_wifi_on)
+                                  : tft.pushImage(144, 33, 16, 16, img_wifi_off);
 
-  // getLightStat_ASRPRO();
+  if (objBuffer.equals("LIGHT"))
+    statBuffer.equals("ON") ? tft.pushImage(144, 17, 16, 16, img_light_on) : tft.pushImage(144, 17, 16, 16, img_light_off);
+  if (objBuffer.equals("FAN"))
+    statBuffer.equals("ON") ? tft.pushImage(144, 1, 16, 16, img_fan) : tft.pushImage(144, 1, 16, 16, img_fan_off);
 }
 
+/**
+ * 设置Wifi网络相关参数
+ */
 void setWiFi()
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -318,6 +320,9 @@ void setWiFi()
   }
 }
 
+/**
+ * 连接OneNet，设置MQTT
+ */
 void setOneNet()
 {
   if (!client.connected())
@@ -350,6 +355,9 @@ void Callback(char *topic, byte *payload, unsigned int length)
   // Parse message as JSON
 }
 
+/**
+ * 通过MQTT协议在OneNet上发布主题（上传温度、湿度灯数据）的函数，数据采用Json格式
+ */
 void sendData()
 {
   if (client.connected())
@@ -373,6 +381,9 @@ void sendData()
   }
 }
 
+/**
+ * 实时获取天气相关状况函数
+ */
 void getWeather()
 {
   JsonDocument doc;
@@ -398,115 +409,124 @@ void getWeather()
     Serial.println(httpClient.GET());
 }
 
+/**
+ * 天气、地区和气温相关状态显示函数
+ * @param city 地区名称，如：Guangzhou
+ * @param weatherStat 天气状况，如：Cloudy
+ * @param temp 气温，如：23
+ */
 void updateImg(const char *city, const char *weatherStat, const char *temp)
 {
   String s(weatherStat);
 
   tft.setTextColor(TFT_PINK, TFT_BLACK);
   tft.drawString(city, 2, 80, 1);
-  tft.drawString(temp, 139, 56, 2);
+  tft.drawString(temp, 141, 56, 2);
 
   // 晴天，不区分早晚
   if (s.equals("Sunny") || s.equals("Clear"))
   {
     tft.pushImage(109, 60, 27, 27, img_sunny);
-    tft.drawString("SN", 139, 75, 2);
+    tft.drawString("SN", 141, 75, 2);
   }
   // 多云
   else if (s.equals("Cloudy"))
   {
     tft.pushImage(109, 60, 27, 27, img_cloudy);
-    tft.drawString("CL", 139, 75, 2);
+    tft.drawString("CL", 141, 75, 2);
   }
   else if (s.equals("Partly cloudy"))
   {
     tft.pushImage(109, 60, 27, 27, img_cloudy);
-    tft.drawString("PC", 139, 75, 2);
+    tft.drawString("PC", 141, 75, 2);
   }
   else if (s.equals("Mostly cloudy"))
   {
     tft.pushImage(109, 60, 27, 27, img_cloudy);
-    tft.drawString("MC", 139, 75, 2);
+    tft.drawString("MC", 141, 75, 2);
   }
   // 阴天
   else if (s.equals("Overcast"))
   {
     tft.pushImage(109, 60, 27, 27, img_overcast);
-    tft.drawString("OC", 139, 75, 2);
+    tft.drawString("OC", 141, 75, 2);
   }
   // 阵雨、雷阵雨
   else if (s.equals("Shower"))
   {
     tft.pushImage(109, 60, 27, 27, img_shower);
-    tft.drawString("SW", 139, 75, 2);
+    tft.drawString("SW", 141, 75, 2);
   }
   else if (s.equals("Thundershower"))
   {
     tft.pushImage(109, 60, 27, 27, img_thunder_shower);
-    tft.drawString("TS", 139, 75, 2);
+    tft.drawString("TS", 141, 75, 2);
   }
   // 中、小雨
   else if (s.equals("Light rain"))
   {
     tft.pushImage(109, 60, 27, 27, img_rainy);
-    tft.drawString("LR", 139, 75, 2);
+    tft.drawString("LR", 141, 75, 2);
   }
   else if (s.equals("Moderate rain"))
   {
     tft.pushImage(109, 60, 27, 27, img_rainy);
-    tft.drawString("MR", 139, 75, 2);
+    tft.drawString("MR", 141, 75, 2);
   }
   // 特大、大暴雨
   else if (s.equals("Heavy rain"))
   {
     tft.pushImage(109, 60, 27, 27, img_heavy_rainy);
-    tft.drawString("HR", 139, 75, 2);
+    tft.drawString("HR", 141, 75, 2);
   }
   else if (s.equals("Storm"))
   {
     tft.pushImage(109, 60, 27, 27, img_heavy_rainy);
-    tft.drawString("ST", 139, 75, 2);
+    tft.drawString("ST", 141, 75, 2);
   }
   // 雾
   else if (s.equals("Foggy"))
   {
     tft.pushImage(109, 60, 27, 27, img_foggy);
-    tft.drawString("FG", 139, 75, 2);
+    tft.drawString("FG", 141, 75, 2);
   }
   // 霾
   else if (s.equals("Haze"))
   {
     tft.pushImage(109, 60, 27, 27, img_haze);
-    tft.drawString("HZ", 139, 75, 2);
+    tft.drawString("HZ", 141, 75, 2);
   }
   // 有风
   else if (s.equals("Windy"))
   {
     tft.pushImage(109, 60, 27, 21, img_windy);
-    tft.drawString("WD", 139, 75, 2);
+    tft.drawString("WD", 141, 75, 2);
   }
   // 大风
   else if (s.equals("Blustery"))
   {
     tft.pushImage(109, 60, 27, 21, img_windy);
-    tft.drawString("BL", 139, 75, 2);
+    tft.drawString("BL", 141, 75, 2);
   }
   // 寒冷
   else if (s.equals("Cold"))
   {
     tft.pushImage(109, 60, 27, 27, img_cold);
-    tft.drawString("CD", 139, 75, 2);
+    tft.drawString("CD", 141, 75, 2);
   }
 }
 
+/**
+ *  串口2回调函数，接收AsrPro串口发送的数据（状态码，如灯光状态、风扇状态），并处理
+ */
 void getLightStat_ASRPRO()
 {
   if (Serial2.available())
   {
-    // uint8_t *recvBuffer;
-    // Serial2.read(recvBuffer, 8);
-    // Serial.println((unsigned int)recvBuffer, HEX);
-    String recvBuffer = Serial2.readStringUntil('\n');
-    Serial.println(recvBuffer);
+    String recvBuffer = Serial2.readString();
+    objBuffer = recvBuffer.substring(0, recvBuffer.indexOf(":"));
+    statBuffer = recvBuffer.substring(recvBuffer.indexOf(":") + 1);
   }
+  // Serial.println(objBuffer);
+  // Serial.println(statBuffer);
 }
