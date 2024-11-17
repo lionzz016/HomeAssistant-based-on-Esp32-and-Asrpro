@@ -1,0 +1,257 @@
+//集成了报时功能、天气播报功能和闹钟功能。
+
+#include "asr.h"
+extern "C"{ void * __dso_handle = 0 ;}
+#include "setup.h"
+#include "myLib/asr_ws2812.h"
+#include "HardwareSerial.h"
+#include "myLib/asr_event.h"
+#include "MIDI.h"
+
+uint32_t snid;
+uint64_t tim = 0;
+void ASR_CODE();
+MIDI midi = MIDI(4);//自定义代码
+
+void stimer_1(TimerHandle_t xTimer);
+TimerHandle_t softtimer_1=NULL;
+
+//{speak:小蝶-清新女声,vol:2,speed:10,platform:haohaodada}
+//{playid:10001,voice:欢迎}
+//{playid:10002,voice:}
+
+WS2812 ASR_WS2812_0(0);
+/*描述该功能...
+*/
+void ASR_CODE(){
+  //本函数是语音识别成功钩子程序
+  //运行时间越短越好，复杂控制启动新线程运行
+  //唤醒时间设置必须在ASR_CODE中才有效
+  set_state_enter_wakeup(30000);
+  //用switch分支选择，根据不同的识别成功的ID执行相应动作，点击switch左上齿轮
+  //可以增加分支项
+  switch (snid) {
+   case 1:
+    ASR_WS2812_0.setBrightness(128);
+    ASR_WS2812_0.pixel_set_all_color(255,255,255);
+    ASR_WS2812_0.pixel_show();
+    Serial2.write(0x01);
+    break;
+   case 2:
+    ASR_WS2812_0.pixel_set_all_color(0,0,0);
+    ASR_WS2812_0.pixel_show();
+    Serial2.write(0x00);
+    break;
+   case 3:
+    Serial2.write(0x11);
+    break;
+   case 4:
+    Serial2.write(0x10);
+    break;
+   case 5:
+    Serial2.write(0xDF);
+    delay(1000);
+    if(Serial2.available() > 0){
+      String strBuffer = Serial2.readString();
+      Serial.println(strBuffer);
+      String weatherBuffer = String(strBuffer).substring(0,String(strBuffer).indexOf(",",1));
+      String tempBuffer = String(strBuffer).substring(String(strBuffer).indexOf(",",1) + 1,0);
+      //{playid:10500,voice:现在的天气是}
+      play_audio(10500);
+      if(weatherBuffer == "Sunny"){
+        //{playid:10501,voice:晴}
+        play_audio(10501);
+      }
+      if(weatherBuffer == "Clear"){
+        //{playid:10502,voice:晴}
+        play_audio(10502);
+      }
+      if(weatherBuffer == "Cloudy"){
+        //{playid:10503,voice:多云}
+        play_audio(10503);
+      }
+      if(weatherBuffer == "Overcast"){
+        //{playid:10504,voice:阴}
+        play_audio(10504);
+      }
+      if(weatherBuffer == "Partly cloudy"){
+        //{playid:10505,voice:晴间多云}
+        play_audio(10505);
+      }
+      if(weatherBuffer == "Mostly cloudy"){
+        //{playid:10506,voice:大部多云}
+        play_audio(10506);
+      }
+      if(weatherBuffer == "Shower"){
+        //{playid:10507,voice:阵雨}
+        play_audio(10507);
+      }
+      if(weatherBuffer == "Thundershower"){
+        //{playid:10508,voice:雷阵雨}
+        play_audio(10508);
+      }
+      if(weatherBuffer == "Light rain"){
+        //{playid:10509,voice:小雨}
+        play_audio(10509);
+      }
+      if(weatherBuffer == "Moderate rain"){
+        //{playid:10510,voice:中雨}
+        play_audio(10510);
+      }
+      if(weatherBuffer == "Heavy rain"){
+        //{playid:10511,voice:大雨}
+        play_audio(10511);
+      }
+      if(weatherBuffer == "Storm"){
+        //{playid:10512,voice:暴雨}
+        play_audio(10512);
+      }
+      if(weatherBuffer == "Foggy"){
+        //{playid:10513,voice:雾}
+        play_audio(10513);
+      }
+      if(weatherBuffer == "Haze"){
+        //{playid:10514,voice:霾}
+        play_audio(10514);
+      }
+      if(weatherBuffer == "Windy"){
+        //{playid:10515,voice:凉爽}
+        play_audio(10515);
+      }
+      if(weatherBuffer == "Blustery"){
+        //{playid:10516,voice:大风}
+        play_audio(10516);
+      }
+      if(weatherBuffer == "Cold"){
+        //{playid:10517,voice:寒冷}
+        play_audio(10517);
+      }
+      //{playid:10518,voice:气温}
+      play_audio(10518);
+      play_num((int64_t)((String(tempBuffer).toInt()) * 100), 1);
+      //{playid:10519,voice:摄氏度}
+      play_audio(10519);
+    }
+    break;
+   case 6:
+    Serial2.write(0xBF);
+    delay(1000);
+    if(Serial2.available() > 0){
+      String timeStr = Serial2.readString();
+      Serial.println(timeStr);
+      String year = String(timeStr).substring(0,String(timeStr).indexOf("-",1));
+      String month = String(timeStr).substring(String(timeStr).indexOf("-",1) + 1,String(timeStr).indexOf("/",1));
+      String day = String(timeStr).substring(String(timeStr).indexOf("/",1) + 1,String(timeStr).indexOf(".",1));
+      String wday = String(timeStr).substring(String(timeStr).indexOf(".",1) + 1,String(timeStr).indexOf(",",1));
+      String hour = String(timeStr).substring(String(timeStr).indexOf(",",1) + 1,String(timeStr).indexOf(":",1));
+      String min2 = String(timeStr).substring(String(timeStr).indexOf(":",1) + 1,0);
+      //{playid:10520,voice:现在的时间是}
+      play_audio(10520);
+      play_num((int64_t)((String(hour).toInt()) * 100), 1);
+      //{playid:10521,voice:点}
+      play_audio(10521);
+      play_num((int64_t)((String(min2).toInt()) * 100), 1);
+      //{playid:10522,voice:分}
+      play_audio(10522);
+      play_num((int64_t)((String(year).toInt()) * 100), 0);
+      //{playid:10523,voice:年}
+      play_audio(10523);
+      play_num((int64_t)((String(month).toInt()) * 100), 1);
+      //{playid:10524,voice:月}
+      play_audio(10524);
+      play_num((int64_t)((String(day).toInt()) * 100), 1);
+      //{playid:10525,voice:日}
+      play_audio(10525);
+      if(wday == "0"){
+        //{playid:10526,voice:星期日}
+        play_audio(10526);
+      }
+      if(wday == "1"){
+        //{playid:10527,voice:星期一}
+        play_audio(10527);
+      }
+      if(wday == "2"){
+        //{playid:10528,voice:星期二}
+        play_audio(10528);
+      }
+      if(wday == "3"){
+        //{playid:10529,voice:星期三}
+        play_audio(10529);
+      }
+      if(wday == "4"){
+        //{playid:10530,voice:星期四}
+        play_audio(10530);
+      }
+      if(wday == "5"){
+        //{playid:10531,voice:星期五}
+        play_audio(10531);
+      }
+      if(wday == "6"){
+        //{playid:10532,voice:星期六}
+        play_audio(10532);
+      }
+    }
+    break;
+   case 7:
+    xTimerStart(softtimer_1,0);
+    break;
+  }
+
+}
+
+void stimer_1(TimerHandle_t xTimer){
+  tim = millis();
+  while (millis() - tim < 20000) {
+    midi.beat0(60);
+  }
+}
+
+void hardware_init(){
+  softtimer_1=xTimerCreate("stimer_1",150000,0,0,stimer_1);
+  //需要操作系统启动后初始化的内容
+  //音量范围1-7
+  vol_set(1);
+  vTaskDelete(NULL);
+}
+
+void setup()
+{
+  //需要操作系统启动前初始化的内容
+  //播报音下拉菜单可以选择，合成音量是指TTS生成文件的音量
+  //欢迎词指开机提示音，可以为空
+  //退出语音是指休眠时提示音，可以为空
+  //休眠后用唤醒词唤醒后才能执行命令，唤醒词最多5个。回复语可以空。ID范围为0-9999
+  //{ID:0,keyword:"唤醒词",ASR:"天问五幺",ASRTO:"我在"}
+  //{ID:1,keyword:"命令词",ASR:"打开灯光",ASRTO:"好的"}
+  //{ID:2,keyword:"命令词",ASR:"关闭灯光",ASRTO:"好的"}
+  //{ID:3,keyword:"命令词",ASR:"打开风扇",ASRTO:"好的"}
+  //{ID:4,keyword:"命令词",ASR:"关闭风扇",ASRTO:"好的"}
+  //{ID:5,keyword:"命令词",ASR:"天气状况",ASRTO:"没问题"}
+  //{ID:6,keyword:"命令词",ASR:"当前时间",ASRTO:"稍等"}
+  //{ID:7,keyword:"命令词",ASR:"给我设置一个五分钟后的闹钟",ASRTO:"好的，我将在五分钟后提醒你"}
+  ASR_WS2812_0.pixel_init(30);
+  setPinFun(13,SECOND_FUNCTION);
+  setPinFun(14,SECOND_FUNCTION);
+  Serial.begin(9600);
+  setPinFun(5,FORTH_FUNCTION);
+  setPinFun(6,FORTH_FUNCTION);
+  Serial2.begin(115200);
+
+  //{playid:10084,voice:零}
+  //{playid:10085,voice:一}
+  //{playid:10086,voice:二}
+  //{playid:10087,voice:三}
+  //{playid:10088,voice:四}
+  //{playid:10089,voice:五}
+  //{playid:10090,voice:六}
+  //{playid:10091,voice:七}
+  //{playid:10092,voice:八}
+  //{playid:10093,voice:九}
+  //{playid:10094,voice:十}
+  //{playid:10095,voice:百}
+  //{playid:10096,voice:千}
+  //{playid:10097,voice:万}
+  //{playid:10098,voice:亿}
+  //{playid:10099,voice:负}
+  //{playid:10100,voice:点}
+}
