@@ -63,19 +63,19 @@ code	color
 
 // 定义onenet接入的产品和设备
 // 产品ID
-#define PRODUCT_ID "VTZ5UT4n37"
+#define CLIENT_ID "temp_humidity"
 // 设备名称
-#define DEVICE_ID "temp_humidity"
+#define USERNAME "VTZ5UT4n37"
 // 设备的鉴权信息
-#define DEVICE_TOKEN "version=2018-10-31&res=products%2FVTZ5UT4n37%2Fdevices%2Ftemp_humidity&et=1762853395&method=md5&sign=sJ%2F5otKuH6QHGlkSUxHKpg%3D%3D"
+#define PASSWORD "version=2018-10-31&res=products%2FVTZ5UT4n37%2Fdevices%2Ftemp_humidity&et=1762853395&method=md5&sign=sJ%2F5otKuH6QHGlkSUxHKpg%3D%3D"
 
 // 定义mqtt的主题的订阅和下发同步命令
 //  订阅主题
-#define ONENET_TOPIC_GET "$sys/" PRODUCT_ID "/" DEVICE_ID "/cmd/request/+"
+#define MQTT_TOPIC_GET "$sys/" USERNAME "/" CLIENT_ID "/cmd/request/+"
 // 发布主题
-#define ONENET_TOPIC_POST "$sys/" PRODUCT_ID "/" DEVICE_ID "/dp/post/json"
+#define MQTT_TOPIC_POST "$sys/" USERNAME "/" CLIENT_ID "/dp/post/json"
 // 数据源的头head
-#define ONENET_POST_BODY_FORMAT "{\"id\":%d,\"dp\":%s}"
+#define MQTT_POST_BODY_FORMAT "{\"id\":%d,\"dp\":%s}"
 
 // 天气api的私钥
 #define API_KEY "SPIRhXLh-dt5N2tga"
@@ -104,12 +104,12 @@ byte omm = 99;
 bool initial = 1;
 byte xcolon = 0;
 unsigned int colour = 0;
+uint32_t post_id = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-uint32_t postMsgId = 0;
 
 HTTPClient httpClient;
 
@@ -124,7 +124,7 @@ String MONTH[] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.",
 String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
 
 // 串口回调函数接收AsrPro发送的十六进制数据的sta变量，采用全局变量是为了其他函数的使用
-uint8_t sta = 0xff;
+uint8_t sta = 0xFF;
 /**============================================================================= */
 
 /**
@@ -133,7 +133,7 @@ uint8_t sta = 0xff;
  */
 
 void setWiFi();
-void setOneNet();
+void setMqtt();
 
 void Callback(char *topic, byte *payload, unsigned int length);
 void sendData();
@@ -144,7 +144,7 @@ void getStat_ASRPRO();
 Ticker tim1(sendData, 300);
 Ticker tim2(getWeather, 5000);
 Ticker tim3(setWiFi, 100);
-Ticker tim4(setOneNet, 100);
+Ticker tim4(setMqtt, 1000);
 
 // 获取完整天气api的连接，设置参数是为了低耦合
 String getURL(const char *key, const char *location, const char *lang, const char *unit)
@@ -343,18 +343,20 @@ void setWiFi()
 /**
  * 连接OneNet，设置MQTT
  */
-void setOneNet()
+void setMqtt()
 {
   if (!client.connected())
   {
-    Serial.println("OneNet connected failure!");
+    Serial.println("MQTT connected failure!");
+    Serial.print("State Code:");
+    Serial.println(client.state());
     client.setServer(MQTT_SERVER, MQTT_PORT);
-    client.connect(DEVICE_ID, PRODUCT_ID, DEVICE_TOKEN);
+    client.connect(CLIENT_ID, USERNAME, PASSWORD);
   }
   else
   {
-    Serial.println("OneNet connected!");
-    client.subscribe(ONENET_TOPIC_GET);
+    Serial.println("MQTT connected!");
+    client.subscribe(MQTT_TOPIC_GET);
     client.setCallback(Callback);
   }
 }
@@ -388,14 +390,13 @@ void sendData()
     char param[82];
     char jsonBuf[178];
     sprintf(param,
-            "{\"temp\": [{\"v\": %.2f }],\"humi\": [{ \"v\": %.2f}]}",
+            "{ \"temp\":[{\"v\": %.2f}], \"humi\":[{ \"v\": %.2f}] }",
             dht.readTemperature(), dht.readHumidity()); // 我们把要上传的数据写在param里
-
-    postMsgId += 1;
-    sprintf(jsonBuf, ONENET_POST_BODY_FORMAT, postMsgId, param);
+    post_id += 1;
+    sprintf(jsonBuf, MQTT_POST_BODY_FORMAT, post_id, param);
 
     // client.publish("$dp", (uint8_t *)msg_buf, 3+strlen(msgJson));
-    client.publish(ONENET_TOPIC_POST, jsonBuf);
+    client.publish(MQTT_TOPIC_POST, jsonBuf);
     // 发送数据到主题
     // delay(20);
   }

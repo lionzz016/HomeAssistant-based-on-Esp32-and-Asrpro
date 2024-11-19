@@ -55,7 +55,7 @@ void ASR_CODE(){
       String strBuffer = Serial2.readString();
       Serial.println(strBuffer);
       String weatherBuffer = String(strBuffer).substring(0,String(strBuffer).indexOf(",",1));
-      String tempBuffer = String(strBuffer).substring(String(strBuffer).indexOf(",",1) + 1,0);
+      String tempBuffer = String(strBuffer).substring(String(strBuffer).indexOf(",",1) + 1);
       //{playid:10500,voice:现在的天气是}
       play_audio(10500);
       if(weatherBuffer == "Sunny"){
@@ -144,7 +144,7 @@ void ASR_CODE(){
       String day = String(timeStr).substring(String(timeStr).indexOf("/",1) + 1,String(timeStr).indexOf(".",1));
       String wday = String(timeStr).substring(String(timeStr).indexOf(".",1) + 1,String(timeStr).indexOf(",",1));
       String hour = String(timeStr).substring(String(timeStr).indexOf(",",1) + 1,String(timeStr).indexOf(":",1));
-      String min2 = String(timeStr).substring(String(timeStr).indexOf(":",1) + 1,0);
+      String min2 = String(timeStr).substring(String(timeStr).indexOf(":",1) + 1);
       //{playid:10520,voice:现在的时间是}
       play_audio(10520);
       play_num((int64_t)((String(hour).toInt()) * 100), 1);
