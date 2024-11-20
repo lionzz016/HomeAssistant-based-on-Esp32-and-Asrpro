@@ -63,11 +63,11 @@ code	color
 
 // 定义onenet接入的产品和设备
 // 产品ID
-#define CLIENT_ID "temp_humidity"
+#define CLIENT_ID "monitor"
 // 设备名称
-#define USERNAME "VTZ5UT4n37"
+#define USERNAME "Hn5sqb3tOh"
 // 设备的鉴权信息
-#define PASSWORD "version=2018-10-31&res=products%2FVTZ5UT4n37%2Fdevices%2Ftemp_humidity&et=1762853395&method=md5&sign=sJ%2F5otKuH6QHGlkSUxHKpg%3D%3D"
+#define PASSWORD "version=2018-10-31&res=products%2FHn5sqb3tOh%2Fdevices%2Fmonitor&et=1762853395&method=md5&sign=KAP2tyZkwpBcfI1uMvLpXA%3D%3D"
 
 // 定义mqtt的主题的订阅和下发同步命令
 //  订阅主题
@@ -125,6 +125,11 @@ String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
 
 // 串口回调函数接收AsrPro发送的十六进制数据的sta变量，采用全局变量是为了其他函数的使用
 uint8_t sta = 0xFF;
+
+bool wifi_stat = false;
+bool light_stat = false;
+bool fan_stat = false;
+
 /**============================================================================= */
 
 /**
@@ -283,13 +288,25 @@ void loop()
                                   : tft.pushImage(144, 33, 16, 16, img_wifi_off);
 
   if (sta == 0x01)
+  {
     tft.pushImage(144, 17, 16, 16, img_light_on);
+    light_stat = true;
+  }
   if (sta == 0x00)
+  {
     tft.pushImage(144, 17, 16, 16, img_light_off);
+    light_stat = false;
+  }
   if (sta == 0x11)
+  {
     tft.pushImage(146, 2, 13, 13, img_fan_on);
+    fan_stat = true;
+  }
   if (sta == 0x10)
+  {
     tft.pushImage(146, 2, 13, 13, img_fan_off);
+    fan_stat = false;
+  }
 
   if (sta == 0xDF)
   {
@@ -307,6 +324,8 @@ void loop()
     Serial2.printf("%d-%d/%d.%d,%d:%d", timestamp.tm_year + 1900, timestamp.tm_mon + 1, timestamp.tm_mday, timestamp.tm_wday, timestamp.tm_hour, timestamp.tm_min);
     sta = 0xFF;
   }
+
+  WiFi.status() == WL_CONNECTED ? wifi_stat = true : wifi_stat = false;
 }
 
 /**
@@ -387,11 +406,12 @@ void sendData()
   {
 
     // 先拼接出json字符串
-    char param[82];
-    char jsonBuf[178];
+    char param[128];
+    char jsonBuf[192];
+
     sprintf(param,
-            "{ \"temp\":[{\"v\": %.2f}], \"humi\":[{ \"v\": %.2f}] }",
-            dht.readTemperature(), dht.readHumidity()); // 我们把要上传的数据写在param里
+            "{ \"temp\":[{\"v\": %.2f}], \"humi\":[{ \"v\": %.2f}], \"wifi\": [{ \"v\": %d}], \"light\": [{ \"v\": %d}], \"fan\": [{ \"v\": %d}] }",
+            dht.readTemperature(), dht.readHumidity(), wifi_stat, light_stat, fan_stat); // 我们把要上传的数据写在param里
     post_id += 1;
     sprintf(jsonBuf, MQTT_POST_BODY_FORMAT, post_id, param);
 
