@@ -406,8 +406,8 @@ void sendData()
   {
 
     // 先拼接出json字符串
-    char param[128];
-    char jsonBuf[192];
+    char param[169];
+    char jsonBuf[252];
 
     sprintf(param,
             "{ \"temp\":[{\"v\": %.2f}], \"humi\":[{ \"v\": %.2f}], \"wifi\": [{ \"v\": %d}], \"light\": [{ \"v\": %d}], \"fan\": [{ \"v\": %d}] }",
@@ -420,6 +420,8 @@ void sendData()
     // 发送数据到主题
     // delay(20);
   }
+  else
+    setMqtt();
 }
 
 /**
