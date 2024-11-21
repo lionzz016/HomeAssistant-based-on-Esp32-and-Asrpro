@@ -70,7 +70,7 @@ code	color
 #define PASSWORD "version=2018-10-31&res=products%2FHn5sqb3tOh%2Fdevices%2Fmonitor&et=1762853395&method=md5&sign=KAP2tyZkwpBcfI1uMvLpXA%3D%3D"
 
 // 定义mqtt的主题的订阅和下发同步命令
-//  订阅主题
+//  设备订阅主题，平台就能发布同步命令，从而下发数据、指令给设备了
 #define MQTT_TOPIC_GET "$sys/" USERNAME "/" CLIENT_ID "/cmd/request/+"
 // 发布主题
 #define MQTT_TOPIC_POST "$sys/" USERNAME "/" CLIENT_ID "/dp/post/json"
@@ -274,10 +274,8 @@ void loop()
     tim3.pause();
 
   tim4.update();
-  if (client.connected())
-    tim4.pause();
-  // else
-  //   tim4.resume();
+  if (!client.connected())
+    tim4.resume();
 
   client.loop();
   tim1.update();
@@ -377,6 +375,7 @@ void setMqtt()
     Serial.println("MQTT connected!");
     client.subscribe(MQTT_TOPIC_GET);
     client.setCallback(Callback);
+    tim4.pause();
   }
 }
 
@@ -388,12 +387,34 @@ void Callback(char *topic, byte *payload, unsigned int length)
   Serial.print("] ");
   // Handle incoming message here
   String message = "";
+  const char *target = "";
+  JsonDocument doc;
   for (int i = 0; i < length; i++)
   {
     message += (char)payload[i];
   }
+  DeserializationError error = deserializeJson(doc, message);
+  if (!error)
+  {
+    target = doc["command"];
+    // Serial.println(target);
+  }
+  else
+    Serial.print("invalid json format!");
 
-  Serial.println("Received message: " + message);
+  if (!strcmp("0x01", target))
+    sta = 0x01;
+  else if (!strcmp("0x00", target))
+    sta = 0x00;
+  else if (!strcmp("0x11", target))
+    sta = 0x11;
+  else if (!strcmp("0x10", target))
+    sta = 0x10;
+  else
+    target = "error stat code!";
+  Serial2.write(sta);
+  Serial.print("Received message:");
+  Serial.println(target);
   // Parse message as JSON
 }
 
@@ -421,7 +442,7 @@ void sendData()
     // delay(20);
   }
   else
-    setMqtt();
+    tim4.resume();
 }
 
 /**
