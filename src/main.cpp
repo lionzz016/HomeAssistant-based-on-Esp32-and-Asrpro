@@ -146,7 +146,7 @@ void getWeather();
 void updateImg(const char *city, const char *weatherStat, const char *temp);
 void getStat_ASRPRO();
 
-Ticker tim1(sendData, 300);
+Ticker tim1(sendData, 200);
 Ticker tim2(getWeather, 5000);
 Ticker tim3(setWiFi, 100);
 Ticker tim4(setMqtt, 1000);
@@ -403,13 +403,26 @@ void Callback(char *topic, byte *payload, unsigned int length)
     Serial.print("invalid json format!");
 
   if (!strcmp("0x01", target))
+  {
     sta = 0x01;
+    light_stat = true;
+  }
   else if (!strcmp("0x00", target))
+  {
     sta = 0x00;
+    light_stat = false;
+  }
   else if (!strcmp("0x11", target))
+  {
     sta = 0x11;
+    fan_stat = true;
+  }
   else if (!strcmp("0x10", target))
+  {
     sta = 0x10;
+    fan_stat = false;
+  }
+
   else
     target = "error stat code!";
   Serial2.write(sta);
