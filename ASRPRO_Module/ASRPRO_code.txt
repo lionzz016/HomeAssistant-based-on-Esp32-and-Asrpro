@@ -209,23 +209,20 @@ void stimer_1(TimerHandle_t xTimer){
 void stimer_2(TimerHandle_t xTimer){
   if(Serial2.available() > 0){
     uint8_t cmd = Serial2.read();
-    switch (cmd) {
-     case 0x01:
+    if(cmd == 0x01){
       ASR_WS2812_0.setBrightness(128);
       ASR_WS2812_0.pixel_set_all_color(255,255,255);
       ASR_WS2812_0.pixel_show();
-      break;
-     case 0x00:
+    }
+    if(cmd == 0x00){
       ASR_WS2812_0.pixel_set_all_color(0,0,0);
       ASR_WS2812_0.pixel_show();
-      break;
-     case 0x11:
-      ASR_CODE();
-      break;
-     case 0x10:
-      break;
-     default:
-      break;
+    }
+    if(cmd == 0x11){
+
+    }
+    if(cmd == 0x10){
+
     }
   }
 }
@@ -281,4 +278,3 @@ void setup()
   //{playid:10099,voice:负}
   //{playid:10100,voice:点}
 }
-
