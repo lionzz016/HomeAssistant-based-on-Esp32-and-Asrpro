@@ -1,5 +1,3 @@
-//集成了报时功能、天气播报功能和闹钟功能。
-
 #include "asr.h"
 extern "C"{ void * __dso_handle = 0 ;}
 #include "setup.h"
@@ -15,6 +13,8 @@ MIDI midi = MIDI(4);//自定义代码
 
 void stimer_1(TimerHandle_t xTimer);
 TimerHandle_t softtimer_1=NULL;
+void stimer_2(TimerHandle_t xTimer);
+TimerHandle_t softtimer_2=NULL;
 
 //{speak:小蝶-清新女声,vol:2,speed:10,platform:haohaodada}
 //{playid:10001,voice:欢迎}
@@ -206,8 +206,34 @@ void stimer_1(TimerHandle_t xTimer){
   }
 }
 
+void stimer_2(TimerHandle_t xTimer){
+  if(Serial2.available() > 0){
+    uint8_t cmd = Serial2.read();
+    switch (cmd) {
+     case 0x01:
+      ASR_WS2812_0.setBrightness(128);
+      ASR_WS2812_0.pixel_set_all_color(255,255,255);
+      ASR_WS2812_0.pixel_show();
+      break;
+     case 0x00:
+      ASR_WS2812_0.pixel_set_all_color(0,0,0);
+      ASR_WS2812_0.pixel_show();
+      break;
+     case 0x11:
+      ASR_CODE();
+      break;
+     case 0x10:
+      break;
+     default:
+      break;
+    }
+  }
+}
+
 void hardware_init(){
+  softtimer_2=xTimerCreate("stimer_2",5,1,0,stimer_2);
   softtimer_1=xTimerCreate("stimer_1",150000,0,0,stimer_1);
+  xTimerStart(softtimer_2,0);
   //需要操作系统启动后初始化的内容
   //音量范围1-7
   vol_set(1);
@@ -255,3 +281,4 @@ void setup()
   //{playid:10099,voice:负}
   //{playid:10100,voice:点}
 }
+
