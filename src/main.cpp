@@ -147,7 +147,7 @@ void updateImg(const char *city, const char *weatherStat, const char *temp);
 void getStat_ASRPRO();
 
 Ticker tim1(sendData, 200);
-Ticker tim2(getWeather, 5000);
+Ticker tim2(getWeather, 1000);
 Ticker tim3(setWiFi, 100);
 Ticker tim4(setMqtt, 1000);
 
@@ -310,10 +310,8 @@ void loop()
   {
     char s[15];
     Serial2.printf("%s,%s", weather, temp);
-    sprintf(s, "%s,%s", weather, temp);
-    Serial.println(s);
-    // Serial.println(String(s).substring(0, (String(s).indexOf(",", 1))));
-    // Serial.println(String(s).substring(String(s).indexOf(",", 1) + 1));
+    // sprintf(s, "%s,%s", weather, temp);
+    // Serial.println(s);
     sta = 0xFF;
   }
 
@@ -602,6 +600,4 @@ void getStat_ASRPRO()
   {
     Serial2.read(&sta, 1);
   }
-  // Serial.println(objBuffer);
-  // Serial.println(statBuffer);
 }
