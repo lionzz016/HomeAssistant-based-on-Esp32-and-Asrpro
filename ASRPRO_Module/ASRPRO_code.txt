@@ -195,6 +195,12 @@ void ASR_CODE(){
    case 7:
     xTimerStart(softtimer_1,0);
     break;
+   case 8:
+    xTimerStart(softtimer_2,0);
+    break;
+   case 9:
+    xTimerStop(softtimer_2,0);
+    break;
   }
 
 }
@@ -228,9 +234,8 @@ void stimer_2(TimerHandle_t xTimer){
 }
 
 void hardware_init(){
-  softtimer_2=xTimerCreate("stimer_2",5,1,0,stimer_2);
+  softtimer_2=xTimerCreate("stimer_2",50,1,0,stimer_2);
   softtimer_1=xTimerCreate("stimer_1",150000,0,0,stimer_1);
-  xTimerStart(softtimer_2,0);
   //需要操作系统启动后初始化的内容
   //音量范围1-7
   vol_set(1);
@@ -252,6 +257,8 @@ void setup()
   //{ID:5,keyword:"命令词",ASR:"天气状况",ASRTO:"没问题"}
   //{ID:6,keyword:"命令词",ASR:"当前时间",ASRTO:"稍等"}
   //{ID:7,keyword:"命令词",ASR:"给我设置一个五分钟后的闹钟",ASRTO:"好的，我将在五分钟后提醒你"}
+  //{ID:8,keyword:"命令词",ASR:"打开开发者模式",ASRTO:"已开启开发者模式"}
+  //{ID:9,keyword:"命令词",ASR:"关闭开发者模式",ASRTO:"已关闭开发者模式"}
   ASR_WS2812_0.pixel_init(30);
   setPinFun(13,SECOND_FUNCTION);
   setPinFun(14,SECOND_FUNCTION);
@@ -278,3 +285,4 @@ void setup()
   //{playid:10099,voice:负}
   //{playid:10100,voice:点}
 }
+
