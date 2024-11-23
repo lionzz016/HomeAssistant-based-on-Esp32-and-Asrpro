@@ -1,6 +1,5 @@
 /*
 A few colour codes:
-
 code	color
 0x0000	Black
 0xFFFF	White
@@ -14,7 +13,6 @@ code	color
 0x7FF	Cyan
 0x1F	Blue
 0xF81F	Pink
-
  */
 
 /**
@@ -23,7 +21,7 @@ code	color
  * TFT-LCD,ST7735S,SPI
  * DHT11
  */
-#include <TFT_eSPI.h> // Graphics and font library for ST7735 driver chip
+#include <TFT_eSPI.h>
 #include <SPI.h>
 
 #include <Adafruit_Sensor.h>
@@ -72,11 +70,12 @@ code	color
 // 定义mqtt的主题的订阅和下发同步命令
 //  设备订阅主题，平台就能发布同步命令，从而下发数据、指令给设备了
 #define MQTT_TOPIC_GET "$sys/" USERNAME "/" CLIENT_ID "/cmd/request/+"
-// 发布主题
+// 发布主题，提交温湿度数据
 #define MQTT_TOPIC_POST "$sys/" USERNAME "/" CLIENT_ID "/dp/post/json"
-// 数据源的头head
+// 数据源的头head，Json格式数据
 #define MQTT_POST_BODY_FORMAT "{\"id\":%d,\"dp\":%s}"
 
+// 知心天气API，免费版访问次数受限
 // 天气api的私钥
 #define API_KEY "SPIRhXLh-dt5N2tga"
 // 目标地区的信息
@@ -123,9 +122,22 @@ struct tm timestamp;
 String MONTH[] = {"Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."};
 String WEEKDAY[] = {"Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."};
 
-// 串口回调函数接收AsrPro发送的十六进制数据的sta变量，采用全局变量是为了其他函数的使用
+/**
+ * 串口回调函数接收AsrPro发送的十六进制数据的sta变量，采用全局变量是为了其他函数的使用
+ * ============================stat code====================================
+ * ===========stat name============================hex code=================
+ *            打开灯光              |                0x01
+ *            关闭灯光              |                0x00
+ *            打开风扇              |                0x11
+ *            关闭风扇              |                0x10
+ *            天气状况              |                0xDF
+ *            当前时间              |                0xBF
+ *            待机状态              |                0xFF
+ * =========================================================================
+ */
 uint8_t sta = 0xFF;
 
+// 需要通过MQTT上传至OneNet的数据，温度和湿度由DHT11测出
 bool wifi_stat = false;
 bool light_stat = false;
 bool fan_stat = false;
@@ -147,7 +159,7 @@ void updateImg(const char *city, const char *weatherStat, const char *temp);
 void getStat_ASRPRO();
 
 Ticker tim1(sendData, 200);
-Ticker tim2(getWeather, 1000);
+Ticker tim2(getWeather, 5000);
 Ticker tim3(setWiFi, 100);
 Ticker tim4(setMqtt, 1000);
 
@@ -312,6 +324,8 @@ void loop()
     Serial2.printf("%s,%s", weather, temp);
     // sprintf(s, "%s,%s", weather, temp);
     // Serial.println(s);
+    Serial.println(weather);
+    Serial.println(temp);
     sta = 0xFF;
   }
 
@@ -357,6 +371,7 @@ void setWiFi()
 
 /**
  * 连接OneNet，设置MQTT
+ * 由定时器tim4控制，当没有连接MQTT时，tim4开启（或恢复）并循环执行，直到连接成功，tim4暂停执行。
  */
 void setMqtt()
 {
@@ -377,15 +392,21 @@ void setMqtt()
   }
 }
 
-// 订阅MQTT所发布的主题的回调函数
+/**
+ * 订阅MQTT所发布的主题的回调函数
+ * @param topic MQTT的报文主题，不同的数据方式有不一样的报文格式
+ * @param payload 该回调函数接收到的数据内容，以一个字节为单位传输
+ * @param length 数据长度
+ */
 void Callback(char *topic, byte *payload, unsigned int length)
 {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
-  // Handle incoming message here
+  // 订阅OneNet通过MQTT 所发布的命令，封装成Json样式的字符串
   String message = "";
   const char *target = "";
+  // 采用Json对象解析获取的字符串
   JsonDocument doc;
   for (int i = 0; i < length; i++)
   {
@@ -394,12 +415,14 @@ void Callback(char *topic, byte *payload, unsigned int length)
   DeserializationError error = deserializeJson(doc, message);
   if (!error)
   {
+    // 拿到目标命令
     target = doc["command"];
     // Serial.println(target);
   }
   else
     Serial.print("invalid json format!");
 
+  // 对命令进行处理
   if (!strcmp("0x01", target))
   {
     sta = 0x01;
